@@ -86,12 +86,13 @@ def run_ba(img_dir, output_dir):
 
 #Input：NTF files，ba results，images，dsms
 #Output：json file （"img"，  "height"，  "width"，  "sun_elevation"，  "sun_azimuth"，  "acquisition_date"，  "geojson"，  "min_alt"，  "max_alt"，  "rpc"）
-def create_dataset_from_DFC2019_data_zll(nerf_dir, aoi_id, img_dir, dfc_dir, output_dir, path_to_dsm, use_ba=False, min_alt=None, max_alt=None):    #, aoi_id = 'JAX_068'
+def create_dataset_from_DFC2019_data_zll(nerf_dir, aoi_id, img_dir, toc_dir, output_dir, path_to_dsm, use_ba=False, min_alt=None, max_alt=None):    #, aoi_id = 'JAX_068'
 
     # create a json file of metadata for each input image
     # contains: h, w, rpc, sun elevation, sun azimuth, acquisition date
     #           + geojson polygon with the aoi of the image
     os.makedirs(output_dir, exist_ok=True)
+    #path_to_msi = "/home/LZhang/Documents/CNESPostDoc/SatNeRFProj/data/Input/DFC2019/MSI/"
     if use_ba:
         from bundle_adjust import loader
         geotiff_paths = loader.load_list_of_paths(os.path.join(output_dir, "ba_files/ba_params/geotiff_paths.txt"))
@@ -112,7 +113,7 @@ def create_dataset_from_DFC2019_data_zll(nerf_dir, aoi_id, img_dir, dfc_dir, out
     newoutput_dir += '/'+aoi_id+'/'
     os.makedirs(newoutput_dir, exist_ok=True)
 
-    msi_p = dfc_dir + '/pleiades_sun_angles.txt'
+    msi_p = toc_dir + '/pleiades_sun_angles.txt'
     print('sun_angle_file', msi_p)
     sun_angles = np.loadtxt(msi_p, dtype='str') #, dtype='float')
     for rgb_p in geotiff_paths:
@@ -124,7 +125,7 @@ def create_dataset_from_DFC2019_data_zll(nerf_dir, aoi_id, img_dir, dfc_dir, out
             if sun_angles[i][0] in d["img"]:
                 idx = i
                 break
-        print(idx, d["img"], sun_angles[idx])
+        print('sun_angles', idx, d["img"], sun_angles[idx])
 
         src = rio_open(rgb_p)
         d["height"] = int(src.meta["height"])
@@ -172,12 +173,22 @@ def create_dataset_from_DFC2019_data_zll(nerf_dir, aoi_id, img_dir, dfc_dir, out
 def generate_img_mask(json_dir, aoi_id='Dji_xxx'):
     all_json = glob.glob("{}/*.json".format(json_dir))
     #ref_img is the most nadir image json file
-    if aoi_id[:3] == 'Dji':
+    if aoi_id[1:3] == 'ji':
         ref_img = 'IMG13_TOC_Converted.json'
+    elif aoi_id == 'Itl_022':
+        ref_img = 'IMG_0005_RGB_nikrup.json'
     elif aoi_id[:3] == 'ItB' or aoi_id[:3] == 'Itl':
-        ref_img = 'IMG_0005_RGB.json'
+        ref_img = 'IMG_0005_RGB_TOC.json'
     elif aoi_id[:3] == 'ItA':
-        ref_img = 'IMG_1005_RGB.json'
+        ref_img = 'IMG_1005_RGB_TOC.json'
+    elif aoi_id == 'Lzh_043':
+        ref_img = 'IMG_RGB_130423_002_TOC.json'
+    elif aoi_id[:3] == 'Lzh':
+        ref_img = 'IMG_RGB_130629_002_TOC.json'
+    elif aoi_id[:3] == 'Lzo':
+        ref_img = 'IMG_RGB_130629_002.json'
+    elif aoi_id[:3] == 'JAX':
+        ref_img = aoi_id+'_008_RGB.json'
     else:
         ref_img = None
     if ref_img != None:
@@ -230,21 +241,24 @@ def create_train_test_splits(input_sample_ids, test_percent=0.15, min_test_sampl
 
 #Input: ../Track3-Truth/JAX_068_DSM.txt (there contains origins, size and resolutions in UTM)
 #Ouput: Bounding box in longitude/latitude
-def read_DFC2019_lonlat_aoi(aoi_id, dfc_dir, DSMFile=None):
+def read_DFC2019_lonlat_aoi(aoi_id, toc_dir, DSMFile=None):
     from bundle_adjust import geo_utils
     if aoi_id[:3] == "JAX":
         zonestring = "17" #"17R"
-    elif aoi_id[:3] == "Dji":
+    elif aoi_id[1:3] == "ji":
         zonestring = "38" #"38N"
     elif aoi_id[:3] == "ItA" or aoi_id[:3] == "ItB" or aoi_id[:3] == "Itl":
         zonestring = "33" 
+    elif aoi_id[0:3] == "Lzh" or aoi_id[0:3] == "Lzo":
+        zonestring = "48" #"38N"
     else:
-        raise ValueError("AOI not valid. Expected JAX_(3digits), Dji_(3digits), ItA_(3digits), ItB_(3digits) but received {}".format(aoi_id))
+        raise ValueError("AOI not valid. Expected JAX_(3digits), Nji_(3digits), Dji_(3digits), ItA_(3digits), ItB_(3digits) but received {}".format(aoi_id))
 
     if DSMFile == None:
-        DSMFile = os.path.join(dfc_dir, "Track3-Truth/" + aoi_id + "_DSM.txt")
+        DSMFile = os.path.join(toc_dir, "Track3-Truth/" + aoi_id + "_DSM.txt")
     roi = np.loadtxt(DSMFile)
     print(DSMFile, roi)
+    #431982.995119  3358519.999913  512.000000  0.500000
     xoff, yoff, xsize, ysize, resolution = roi[0], roi[1], int(roi[2]), int(roi[2]), roi[3]
     ulx, uly, lrx, lry = xoff, yoff + ysize * resolution, xoff + xsize * resolution, yoff
     #bounding box
@@ -281,127 +295,62 @@ def crop_geotiff_lonlat_aoi(geotiff_path, output_path, lonlat_aoi):
         dst.update_tags(**tags)
         dst.update_tags(ns='RPC', **rpc.to_geotiff_dict())
 
-def CropDSM(aoi_id):
-    elif aoi_id == 'Dji_005':
-        #x, y, w, h = 22500, 9000, 2500, 2500      #when flight line is not parallel with coordiante direction, we need a small DSM zone to crop the image patches, and a big DSM zone to crop GT DSM
-        x, y, w, h = 21500, 8000, 4500, 4500       #big DSM
-    elif aoi_id == 'Dji_012':
-        x, y, w, h = 25000, 9000, 2500, 2500       
-        #x, y, w, h = 24000, 8000, 4500, 4500
-    elif aoi_id[:2] == 'It' and aoi_id[-3:] == '001':
-        x, y, w, h = 5800, 26000, 2500, 2500  
-    elif aoi_id[:2] == 'It' and aoi_id[-3:] == '002':
-        x, y, w, h = 2800, 21500, 2500, 2500  
-
-    #aoi_id = 'Djibouti'
-    #DSMFile = '/home/LZhang/Documents/CNESPostDoc/Djibouti/4DSMsFromArthur/'+aoi_id+'_DSM.txt'
-    #aoi_lonlat = read_DFC2019_lonlat_aoi(aoi_id, None, DSMFile)
-    #print(aoi_lonlat)
-    aoi_lonlat = None
-
-    #crop_geotiff_lonlat_aoi(geotiff_path, output_path, lonlat_aoi):
-
-    if aoi_id[:3] == 'Dji':
-        root_dir = '/home/LZhang/Documents/CNESPostDoc/Djibouti/4DSMsFromArthur/'
-        geotiff_path = root_dir + 'mns_pleiades_djibouti_50cm_utm.tif'
-        left_whole, upper_whole, resolution = 214430.250, 1286916.750, 0.5
-    elif aoi_id[:2] == 'It':
-        root_dir = '/home/LZhang/Documents/CNESPostDoc/Italy/DSM_0.5m/'
-        geotiff_path = root_dir + 'dsm_ama2_nord_subset.tif'
-        left_whole, upper_whole, resolution = 350697.75, 4754094.75, 0.5
-    output_tif = root_dir+aoi_id+'_DSM.tif'
-    output_txt = root_dir+aoi_id+'_DSM.txt'
-    #act as we are inputting rpc to avoid loading rpc from geotiff_path
-    print(aoi_id)  
-    crop, x, y = rpcm.utils.crop_aoi(geotiff_path, aoi_lonlat, InputRPC=1, CropDSM = True, box = [x, y, w, h])
-    with rasterio.open(geotiff_path, 'r') as src:
-        profile = src.profile
-        tags = src.tags()
-
-    not_pan = len(crop.shape) > 2
-    if not_pan:
-        profile["height"] = crop.shape[1]
-        profile["width"] = crop.shape[2]
+#scale (TOC) image to [0, 255] so that MVS can generate dense depth
+def ScaleImg(img, bScale=True, SclIndiv=False, min=None, max=None):
+    img_new = img.copy()
+    if SclIndiv == False:
+        if min==None and max==None:
+            max, min = np.max(img_new), np.min(img_new)
+        scale = 255./(max - min)
+        print('----before: min, max', min, max)
+        print('scale', scale)
+        img_new = (img_new - min)*scale
+        max, min = np.max(img_new), np.min(img_new)
+        print('----after: min, max', min, max)
     else:
-        profile["height"] = crop.shape[0]
-        profile["width"] = crop.shape[1]
-        profile["count"] = 1
-    with rasterio.open(output_tif, 'w', **profile) as dst:
-        dst.write(crop, 1)
+        for i in range(3):
+            channel = img_new[i]
+            #print(i, 'th channel before scaling', channel)
+            max, min = np.max(channel), np.min(channel)
+            print('----before: i, min, max', i, min, max)
+            if bScale == True:
+                scale = 255./(max - min)
+                print('channel, scale', i, scale)
+                channel = (channel - min)*scale
+                #print(i, 'th channel after scaling', channel)
+                img_new[i] = channel.astype(int)
 
-    left = left_whole + x * resolution
-    lower = upper_whole - (y+h) * resolution
-    data = [left, lower, str(h), resolution]
-    print(data)
-    np.savetxt(output_txt, data, delimiter="\n", fmt="%s")
+            max, min = np.max(channel), np.min(channel)
+            print('****after:  i, min, max', i, min, max)
 
+    return img_new
 
-def ScaleImg(img):
-    #print('zll-img before scaling: ', img.shape, img)
-    #print(img)
-    for i in range(3):
-        channel = img[i]
-        #print(i, 'th channel before scaling', channel)
-        max = np.max(channel)
-        min = np.min(channel)
-        scale = 255/(max - min)
-        print('channel, scale', i, scale)
-        channel = (channel - min)*scale
-        #print(i, 'th channel after scaling', channel)
-        img[i] = channel.astype(int)
-
-    #print('zll-img after scaling: ', img.shape, img)
-
-    return img
-
-def ConvertTif2GeoTiff(aoi_id, splits = True, min_alt=None, max_alt=None, alt_me=0):
-    if aoi_id[:3] == 'Dji':
-        #idxs = ['4', '7', '13']
-        #idxs = ['8', '12', '13']
-        #idxs = ['6', '13', '14']
-        #idxs = ['2', '13', '15']
-        #idxs = ['2', '13']
-        #idxs = ['4', '13']
-        #idxs = ['8', '12']
-
-        idxs = ['10', '13']
-        idxs = ['10', '14']
-        idxs = ['11', '13']
-        #idxs = ['8', '12']
-        idxs = ['4', '13']
-        #idxs = ['2', '13', '15', '6', '10', '9']
-        idxs = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
+def CropImagePatches(aoi_id, dsm_dir, toc_dir, splits = True, min_alt=None, max_alt=None, alt_me=0, uint8=True):
+    if aoi_id[1:3] == 'ji':
+        prefix, postfix = 'IMG', '_TOC_Converted'
+        #idxs = ['2', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19']
         idxs = ['2', '13', '15']
-        #idxs = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19']
-        #idxs = ['2', '13']
-        idxs = ['2', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19']
-    elif aoi_id[:3] == 'ItA':
-        idxs = ['1004', '1005', '1006']
-    elif aoi_id[:3] == 'ItB':
-        idxs = ['0004', '0005', '0006']
-    elif aoi_id[:3] == 'Itl':
-        idxs = ['0004', '0005', '0006', '1004', '1005', '1006']
-
+    elif aoi_id[:3] == 'Lzh' or aoi_id[:3] == 'Lzo':
+        prefix, postfix = 'IMG_RGB_', '_TOC'
+        #idxs = ['130423_001', '130423_003', '130629_002', '130423_002', '130629_001', '130629_003']
+        idxs = ['130423_001', '130423_003', '130629_002', '130629_003']
+        
     ImgNb = len(idxs)
 
-    #dfc_dir = '/home/LZhang/Documents/CNESPostDoc/Djibouti/Pleiades/TOC/params11/Converted/'
-    if aoi_id[:3] == 'Dji':
-        dfc_dir = '/home/LZhang/Documents/CNESPostDoc/Djibouti/Pleiades/TOC/params10/Converted/'
-        dsmDir = '/home/LZhang/Documents/CNESPostDoc/Djibouti/4DSMsFromArthur/CroppedDSM/'
-        prefix, postfix = 'IMG', '_TOC_Converted'
-    elif aoi_id[:3] == 'ItA' or aoi_id[:3] == 'ItB' or aoi_id[:3] == 'Itl':
-        dfc_dir = '/home/LZhang/Documents/CNESPostDoc/Italy/Image_RGB/'
-        dsmDir = '/home/LZhang/Documents/CNESPostDoc/Italy/DSM_0.5m/'
-        prefix, postfix = 'IMG_', '_RGB'
     subdir = aoi_id + '_' + str(ImgNb) + '_imgs'
-    output_dir = dfc_dir + subdir + '/'
+    output_dir = toc_dir + subdir + '/'
     print('output_dir: ', output_dir)
-    #crops_dir = os.path.join(output_dir, "crops/")
-    #os.makedirs(crops_dir, exist_ok=True)
     
-    DSMTxtFile = dsmDir + aoi_id + '_DSM.txt'
-    DSMFile = dsmDir + aoi_id + '_DSM.tif'
+    DSMTxtFile = dsm_dir + aoi_id + '_DSM.txt'
+    DSMFile = dsm_dir + aoi_id + '_DSM.tif'
     aoi_lonlat = read_DFC2019_lonlat_aoi(aoi_id, None, DSMTxtFile)
+
+    if 1:
+        with rasterio.open(DSMFile, 'r') as f:
+            img = f.read()
+            min, max, mean = np.min(img), np.max(img), np.mean(img)
+            alt_me = mean
+            print("average altitude: ", alt_me)
 
     crops_dir = os.path.join(output_dir, "dataset"+aoi_id+"/")     #subdir+"_NeRF/")
     nerf_dir = crops_dir
@@ -417,24 +366,35 @@ def ConvertTif2GeoTiff(aoi_id, splits = True, min_alt=None, max_alt=None, alt_me
     os.makedirs(crops_dir, exist_ok=True)
     crops_dir = os.path.join(crops_dir, aoi_id+"/")
     os.makedirs(crops_dir, exist_ok=True)
+    crops_ori_dir = os.path.join(crops_dir, "ori/")
+    os.makedirs(crops_ori_dir, exist_ok=True)
+
+    rpc_type = "xml"
+    if aoi_id == 'Itl_022':
+        rpc_type = "json"
+    if aoi_id[:3] == 'JAX':
+        rpc_type = 'img'
+
+    min_, max_ = None, None
 
     for idx in idxs:
-        geotiff_path = dfc_dir + prefix + idx + postfix + '.tif'
+        geotiff_path = toc_dir + prefix + idx + postfix + '.tif'
         output_path = crops_dir + os.path.basename(geotiff_path)
+        output_ori_path = crops_ori_dir + os.path.basename(geotiff_path)
 
-        if aoi_id[:3] == 'Dji':
-            rpc_path = dfc_dir + prefix + idx + postfix + '.xml'
+        if rpc_type == "xml": #aoi_id[1:3] == 'ji':
+            rpc_path = toc_dir + prefix + idx + postfix + '.xml'
             rpc = rpcm.rpc_from_rpc_file(rpc_path)
-        else:
+        elif rpc_type == "json":
+            json_p = toc_dir + prefix + idx + postfix + '.json'
+            d = read_dict_from_json(json_p, aoi_id=aoi_id)
+            rpc = rpcm.RPCModel(d["rpc"], dict_format="rpcm")
+        elif rpc_type == "img":
             rpc = rpcm.rpc_from_geotiff(geotiff_path)
 
-        #print('aoi_lonlat', aoi_lonlat)
-        #print('geotiff_path, rpc', geotiff_path, rpc)
-
-        #rpcm.utils.crop_aoi will project the origin of bounding box (aoi_lonlat) to image coordinates to get the offset of x, y
-        #the new rpc is the same as input with only the offset changed
-        crop, x, y = rpcm.utils.crop_aoi(geotiff_path, aoi_lonlat, z=alt_me, rpc=rpc, InputRPC = 1)
-        ScaleImg(crop)         #this will change the color consistency, but it is necessary for Djibouti and Italy data
+        crop_ori, x, y = rpcm.utils.crop_aoi(geotiff_path, aoi_lonlat, z=alt_me, rpc=rpc, InputRPC = 1)
+        crop = ScaleImg(crop_ori, min=min_, max=max_)
+        print(geotiff_path)
         print('x, y after cropping ', x, y)
         rpc.row_offset -= y     #LINE_OFF
         rpc.col_offset -= x     #SAMP_OFF
@@ -455,9 +415,15 @@ def ConvertTif2GeoTiff(aoi_id, splits = True, min_alt=None, max_alt=None, alt_me
             profile["count"] = 1
 
         print('ImgSz after cropping: ', profile["height"], profile["width"])
-        #print('crop', crop)
 
-        profile['dtype'] = rasterio.uint8
+        #save cropped images without scaling
+        with rasterio.open(output_ori_path, 'w', **profile) as dst:
+            dst.write(crop_ori)
+            dst.update_tags(**tags)
+            dst.update_tags(ns='RPC', **rpc.to_geotiff_dict())
+
+        if uint8 == True:
+            profile['dtype'] = rasterio.uint8
 
         #save cropped images
         with rasterio.open(output_path, 'w', **profile) as dst:
@@ -473,7 +439,7 @@ def ConvertTif2GeoTiff(aoi_id, splits = True, min_alt=None, max_alt=None, alt_me
     if ba:
         run_ba(img_dir, output_dir)
 
-    newoutput_dir = create_dataset_from_DFC2019_data_zll(nerf_dir, aoi_id, img_dir, dfc_dir, output_dir, DSMFile, use_ba=ba, min_alt=min_alt, max_alt=max_alt)  #, aoi_id=aoi_id
+    newoutput_dir = create_dataset_from_DFC2019_data_zll(nerf_dir, aoi_id, img_dir, toc_dir, output_dir, DSMFile, use_ba=ba, min_alt=min_alt, max_alt=max_alt)  #, aoi_id=aoi_id
     generate_img_mask(newoutput_dir, aoi_id)
 
     # create train and test splits
@@ -487,7 +453,6 @@ def ConvertTif2GeoTiff(aoi_id, splits = True, min_alt=None, max_alt=None, alt_me
 
     print("done")
 
-
 def CheckAltBound(path_to_dsm):
     src = rio_open(path_to_dsm)
     dsm = src.read()[0, :, :]
@@ -496,40 +461,74 @@ def CheckAltBound(path_to_dsm):
 
     print('min_alt, max_alt', min_alt, max_alt)
 
-if __name__ == '__main__':
-    if 0:
-        path_to_dsm = '/home/LZhang/Documents/CNESPostDoc/Djibouti/Pleiades/TOC/params10/Converted/Dji_012_3_imgs/DenseDepth-SatNeRFBA/MEC-Malt-ObjGeo/Z_Num8_DeZoom1_STD-MALT_Masked.tif'
-        path_to_dsm = '/home/LZhang/Documents/CNESPostDoc/Djibouti/Pleiades/TOC/params10/Converted/Dji_012_3_imgs/datasetDji_012/Dji2013/Truth/Dji_012_DSM.tif'
-        CheckAltBound(path_to_dsm)
+def CropDSM(aoi_id, dsm_dir, dsm_file, coor_left, coor_upper, resolution):
+    if aoi_id[1:] == 'ji_005':
+        x, y, w, h = 22500, 9000, 2500, 2500        #when flight line is not parallel with coordiante direction, we need a small DSM zone to crop the image patches, and a big DSM zone to crop GT DSM
+        #x, y, w, h = 21500, 8000, 4500, 4500       #big DSM
+    elif aoi_id[1:] == 'ji_012':
+        x, y, w, h = 25000, 9000, 2500, 2500       
+        #x, y, w, h = 24000, 8000, 4500, 4500
+    elif aoi_id[:3] == 'Lzh' and (aoi_id[-3:] == '003' or aoi_id[-3:] == '013'):
+        x, y, w, h = 1700, 10200, 3000, 3000
+    elif aoi_id[:3] == 'Lzh' and (aoi_id[-3:] == '008' or aoi_id[-3:] == '018'):
+        x, y, w, h = 3000, 14000, 3000, 3000
 
-    #aoi_id = 'Dji_005'
-    aoi_id = 'Dji_001'
+    aoi_lonlat = None
 
-    aoi_id = 'ItA_001'
-    aoi_id = 'ItB_001'
-    aoi_id = 'Itl_001'
-
-    aoi_id = 'ItA_002'
-    #aoi_id = 'ItB_002'
-    aoi_id = 'Itl_002'
-    aoi_id = 'Dji_021'
-    min_alt = None
-    max_alt = None
-    alt_me = 0
+    dsm_dir = dsm_dir + '/'
+    geotiff_path = dsm_dir + dsm_file
+    out_dir = dsm_dir
     
-    #CropDSM(aoi_id)
+    output_tif = out_dir+aoi_id+'_DSM.tif'
+    output_txt = out_dir+aoi_id+'_DSM.txt'
+    #act as we are inputting rpc to avoid loading rpc from geotiff_path
+    print(aoi_id)  
+    crop, x, y = rpcm.utils.crop_aoi(geotiff_path, aoi_lonlat, InputRPC=1, CropDSM = True, box = [x, y, w, h])
+    with rasterio.open(geotiff_path, 'r') as src:
+        profile = src.profile
+        tags = src.tags()
 
-    ConvertTif2GeoTiff(aoi_id, min_alt=min_alt, max_alt=max_alt, alt_me=alt_me)
+    not_pan = len(crop.shape) > 2
+    if not_pan:
+        profile["height"] = crop.shape[1]
+        profile["width"] = crop.shape[2]
+    else:
+        profile["height"] = crop.shape[0]
+        profile["width"] = crop.shape[1]
+        profile["count"] = 1
+    with rasterio.open(output_tif, 'w', **profile) as dst:
+        dst.write(crop, 1)
 
-    #newoutput_dir = '/home/LZhang/Documents/CNESPostDoc/Djibouti/Pleiades/TOC/params10/Converted/Dji_012_3_imgs/datasetDji_012/root_dir/crops_rpcs_ba_v2/Dji_012_mask/'
-    newoutput_dir = '/home/LZhang/Documents/CNESPostDoc/Djibouti/Pleiades/TOC/params10/Converted/Dji_005_19_imgs/datasetDji_005/root_dir/crops_rpcs_ba_v2/Dji_005_mask/'
+    left = coor_left + x * resolution
+    lower = coor_upper - (y+h) * resolution
+    data = [left, lower, str(h), resolution]
+    print(data)
+    np.savetxt(output_txt, data, delimiter="\n", fmt="%s")
+    print('output_tif', output_tif)
 
+def config_parser():
+    parser = argparse.ArgumentParser()
 
-    #GenerateImgMask()
+    parser.add_argument("--aoi_id", type=str, default=None,
+                        help='None')
+    parser.add_argument("--dsm_dir", type=str, default=None,
+                        help='None')
+    parser.add_argument("--dsm_file", type=str, default=None,
+                        help='None')
+    parser.add_argument("--coor_left", type=float, default=None,
+                        help='None')
+    parser.add_argument("--coor_upper", type=float, default=None,
+                        help='None')
+    parser.add_argument("--resolution", type=float, default=None,
+                        help='None')
+    parser.add_argument("--img_dir", type=str, default=None,
+                        help='None')
+    
+    return parser.parse_args()
+    
+if __name__ == '__main__':
+    args = config_parser()    
+    
+    CropDSM(args.aoi_id, args.dsm_dir, args.dsm_file, args.coor_left, args.coor_upper, args.resolution)
 
-'''
-cd /home/LZhang/Documents/CNESPostDoc/SatNeRFProj/code/satnerf-master-zll/
-conda activate ba
-python3 zll-create_satellite_dataset.py
-
-'''
+    CropImagePatches(args.aoi_id, args.dsm_dir, args.img_dir)
