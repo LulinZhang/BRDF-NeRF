@@ -605,8 +605,6 @@ class NeRF_pl(pl.LightningModule):
         psnr_, psnr_scl = metrics.psnr(results[f"rgb_{typ}"], rgbs, valid_mask=torch.tile(mask.view(H*W, 1), (1,3)), scl=scl) #, Print=True)
         ssim_all, ssim_all_scl = metrics.ssim(results[f"rgb_{typ}"].view(1, 3, H, W), rgbs.view(1, 3, H, W))
         ssim_, ssim_scl = metrics.ssim(results[f"rgb_{typ}"].view(1, 3, H, W)*mask.view(1, 1, H, W), rgbs.view(1, 3, H, W)*mask.view(1, 1, H, W), scl=scl)
-        lpips_all = metrics.lpips(results[f"rgb_{typ}"].view(3, H, W).cpu(), rgbs.view(3, H, W).cpu()).squeeze()
-        lpips_ = metrics.lpips((results[f"rgb_{typ}"].view(3, H, W)*mask.view(1, H, W)).cpu(), (rgbs.view(3, H, W)*mask.view(1, H, W)).cpu()).squeeze()
 
         if True: #self.args.data == 'sat':
             # 1st image is from the training set, so it must not contribute to the validation metrics
@@ -642,10 +640,8 @@ class NeRF_pl(pl.LightningModule):
                     self.log("val_loss/total", loss)
                     self.log("val_sub/psnr_{}".format(batch_nb), psnr_)
                     self.log("val_sub/ssim_{}".format(batch_nb), ssim_)
-                    self.log("val_sub/lpips_{}".format(batch_nb), lpips_)
                     self.log("val/psnr", psnr_)
                     self.log("val/ssim", ssim_)
-                    self.log("val/lpips", lpips_)
                     if fair_mae == True:
                         self.log("val_sub/mae_{}".format(batch_nb), mae_)
                         self.log("val_sub/mae_nr_{}".format(batch_nb), mae_nr)
@@ -661,7 +657,6 @@ class NeRF_pl(pl.LightningModule):
                 else:
                     self.log("train_/psnr", psnr_)
                     self.log("train_/ssim", ssim_)
-                    self.log("train_/lpips", lpips_)
                     if fair_mae == True:
                         self.log("train_/mae", mae_)
                         self.log("train_/mae_nr", mae_nr)
@@ -670,12 +665,12 @@ class NeRF_pl(pl.LightningModule):
                             self.log("train_/mae_in", mae_in)
                             self.log("train_/mae_out", mae_out)
 
-                strOut += " psnr_all: {:.3f}, ssim_all: {:.3f}, lpips_all: {:.3f}".format(psnr_all, ssim_all, lpips_all.numpy())
+                strOut += " psnr_all: {:.3f}, ssim_all: {:.3f}".format(psnr_all, ssim_all)
                 if scl == True: #torch.abs(psnr_-psnr_scl) > 1e-5:
                     strOut += "\n psnr_scl: {:.3f}, ssim_scl: {:.3f} |".format(psnr_scl, ssim_scl)
                     strOut += " psnr_dif: {:.5f}".format(psnr_-psnr_scl)
                     strOut += " ssim_dif: {:.6f}".format(ssim_-ssim_scl)
-                strOut += "\nloss: {:.3f}, psnr: {:.3f}, ssim: {:.3f}, lpips: {:.3f}\n".format(loss, psnr_, ssim_, lpips_.numpy())
+                strOut += "\nloss: {:.3f}, psnr: {:.3f}, ssim: {:.3f}\n".format(loss, psnr_, ssim_)
                 for k in loss_dict.keys():
                     self.log("val_loss/{}".format(k), loss_dict[k])
                     strOut += " {}: {:.6f}".format(k, loss_dict[k])
