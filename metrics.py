@@ -340,11 +340,10 @@ def ssim(image_pred, image_gt, scl=False):
         ssim_scl = -1
     return ssim, ssim_scl
 
+"""
 def lpips(image_pred, image_gt):
     from lpips import LPIPS as lpips_
-    """
-    image_pred and image_gt: (1, 3, H, W)
-    """
+    #image_pred and image_gt: (1, 3, H, W)
     lpips_func = lpips_()
     return lpips_func(image_pred, image_gt, normalize=True)[0]
-
+"""
