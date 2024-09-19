@@ -14,6 +14,7 @@ import os
 import re
 import cv2
 from PIL import Image
+import argparse
 
 def rio_open(*args,**kwargs):
     import rasterio
@@ -268,32 +269,6 @@ def read_lonlat_aoi(aoi_id, toc_dir, DSMFile=None):
     lonlat_bbx = geo_utils.geojson_polygon(np.vstack((lons, lats)).T)
     return lonlat_bbx
 
-#Input: Bounding box in longitude/latitude, images and rpcs before cropping
-#Output: images and rpcs after cropping
-def crop_geotiff_lonlat_aoi(geotiff_path, output_path, lonlat_aoi):
-    with rasterio.open(geotiff_path, 'r') as src:
-        profile = src.profile
-        tags = src.tags()
-    crop, x, y = rpcm.utils.crop_aoi(geotiff_path, lonlat_aoi)
-    rpc = rpcm.rpc_from_geotiff(geotiff_path)
-    rpc.row_offset -= y
-    rpc.col_offset -= x
-    not_pan = len(crop.shape) > 2
-    if not_pan:
-        profile["height"] = crop.shape[1]
-        profile["width"] = crop.shape[2]
-    else:
-        profile["height"] = crop.shape[0]
-        profile["width"] = crop.shape[1]
-        profile["count"] = 1
-    with rasterio.open(output_path, 'w', **profile) as dst:
-        if not_pan:
-            dst.write(crop)
-        else:
-            dst.write(crop, 1)
-        dst.update_tags(**tags)
-        dst.update_tags(ns='RPC', **rpc.to_geotiff_dict())
-
 #scale (TOC) image to [0, 255] so that MVS can generate dense depth
 def ScaleImg(img, bScale=True, SclIndiv=False, min=None, max=None):
     img_new = img.copy()
@@ -328,11 +303,11 @@ def CropImagePatches(aoi_id, dsm_dir, toc_dir, splits = True, min_alt=None, max_
     if aoi_id[1:3] == 'ji':
         prefix, postfix = 'IMG', '_TOC_Converted'
         #idxs = ['2', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19']
-        idxs = ['2', '13', '15']
+        idxs = ['2', '13', '15', '6', '9', '10']
     elif aoi_id[:3] == 'Lzh' or aoi_id[:3] == 'Lzo':
         prefix, postfix = 'IMG_RGB_', '_TOC'
-        #idxs = ['130423_001', '130423_003', '130629_002', '130423_002', '130629_001', '130629_003']
-        idxs = ['130423_001', '130423_003', '130629_002', '130629_003']
+        idxs = ['130423_001', '130423_003', '130629_002', '130423_002', '130629_001', '130629_003']
+        #idxs = ['130423_001', '130423_003', '130629_002', '130629_003']
         
     ImgNb = len(idxs)
 
@@ -365,8 +340,8 @@ def CropImagePatches(aoi_id, dsm_dir, toc_dir, splits = True, min_alt=None, max_
     os.makedirs(crops_dir, exist_ok=True)
     crops_dir = os.path.join(crops_dir, aoi_id+"/")
     os.makedirs(crops_dir, exist_ok=True)
-    crops_ori_dir = os.path.join(crops_dir, "ori/")
-    os.makedirs(crops_ori_dir, exist_ok=True)
+    crops_scled_dir = os.path.join(crops_dir, "scled/")
+    os.makedirs(crops_scled_dir, exist_ok=True)
 
     rpc_type = "xml"
     if aoi_id == 'Itl_022':
@@ -379,7 +354,7 @@ def CropImagePatches(aoi_id, dsm_dir, toc_dir, splits = True, min_alt=None, max_
     for idx in idxs:
         geotiff_path = toc_dir + prefix + idx + postfix + '.tif'
         output_path = crops_dir + os.path.basename(geotiff_path)
-        output_ori_path = crops_ori_dir + os.path.basename(geotiff_path)
+        output_scled_path = crops_scled_dir + os.path.basename(geotiff_path)
 
         if rpc_type == "xml": #aoi_id[1:3] == 'ji':
             rpc_path = toc_dir + prefix + idx + postfix + '.xml'
@@ -416,7 +391,7 @@ def CropImagePatches(aoi_id, dsm_dir, toc_dir, splits = True, min_alt=None, max_
         print('ImgSz after cropping: ', profile["height"], profile["width"])
 
         #save cropped images without scaling
-        with rasterio.open(output_ori_path, 'w', **profile) as dst:
+        with rasterio.open(output_path, 'w', **profile) as dst:
             dst.write(crop_ori)
             dst.update_tags(**tags)
             dst.update_tags(ns='RPC', **rpc.to_geotiff_dict())
@@ -425,14 +400,14 @@ def CropImagePatches(aoi_id, dsm_dir, toc_dir, splits = True, min_alt=None, max_
             profile['dtype'] = rasterio.uint8
 
         #save cropped images
-        with rasterio.open(output_path, 'w', **profile) as dst:
+        with rasterio.open(output_scled_path, 'w', **profile) as dst:
             dst.write(crop)
             dst.update_tags(**tags)
             dst.update_tags(ns='RPC', **rpc.to_geotiff_dict())
 
         print('Cropped image saved in ', output_path)
 
-    img_dir = crops_dir
+    img_dir = crops_scled_dir
 
     ba = True
     if ba:
