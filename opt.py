@@ -149,7 +149,7 @@ def Train_parser():
                         help='type of dataset')
     parser.add_argument("--model", type=str, default='sps-nerf', choices=['nerf', 's-nerf', 'sat-nerf', 'sps-nerf', 'spsbrdf-nerf'],
                         help="which NeRF to use")
-    parser.add_argument("--gpu_id", type=int, required=True,
+    parser.add_argument("--gpu_id", type=int, default=1,
                         help="GPU that will be used")
 
     # training and network configuration
@@ -239,7 +239,7 @@ def Train_parser():
                         help='1: use nr_an to supervise nr_lr; 2: use nr_sgm to supervise nr_lr; 3: use nr_sgm to supervise nr_an')
     parser.add_argument('--hs_lambda', type=float, default=0.,
                         help='float that multiplies the hard surface regularization auxiliary loss')
-    parser.add_argument('--brdf_on', type=float, default=0.,
+    parser.add_argument('--brdf_on', type=float, default=1.,
                         help='portion of training steps at which the BRDF will be turned on, 0-1')
     parser.add_argument('--nrrg_on', type=float, default=0.,
                         help='portion of training steps at which the normal regularization will be turned on, 0-1')
