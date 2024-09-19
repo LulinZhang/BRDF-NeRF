@@ -6,7 +6,7 @@ import torch
 import numpy as np
 from kornia.losses import ssim as ssim__
 import train_utils
-from lpips import LPIPS as lpips_
+
 
 class NerfLoss(torch.nn.Module):
     def __init__(self):
@@ -341,6 +341,7 @@ def ssim(image_pred, image_gt, scl=False):
     return ssim, ssim_scl
 
 def lpips(image_pred, image_gt):
+    from lpips import LPIPS as lpips_
     """
     image_pred and image_gt: (1, 3, H, W)
     """
