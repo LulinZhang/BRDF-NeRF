@@ -86,13 +86,12 @@ def run_ba(img_dir, output_dir):
 
 #Input：NTF files，ba results，images，dsms
 #Output：json file （"img"，  "height"，  "width"，  "sun_elevation"，  "sun_azimuth"，  "acquisition_date"，  "geojson"，  "min_alt"，  "max_alt"，  "rpc"）
-def create_dataset_from_DFC2019_data_zll(nerf_dir, aoi_id, img_dir, toc_dir, output_dir, path_to_dsm, use_ba=False, min_alt=None, max_alt=None):    #, aoi_id = 'JAX_068'
+def create_dataset(nerf_dir, aoi_id, img_dir, toc_dir, output_dir, path_to_dsm, use_ba=False, min_alt=None, max_alt=None):    #, aoi_id = 'JAX_068'
 
     # create a json file of metadata for each input image
     # contains: h, w, rpc, sun elevation, sun azimuth, acquisition date
     #           + geojson polygon with the aoi of the image
     os.makedirs(output_dir, exist_ok=True)
-    #path_to_msi = "/home/LZhang/Documents/CNESPostDoc/SatNeRFProj/data/Input/DFC2019/MSI/"
     if use_ba:
         from bundle_adjust import loader
         geotiff_paths = loader.load_list_of_paths(os.path.join(output_dir, "ba_files/ba_params/geotiff_paths.txt"))
@@ -241,7 +240,7 @@ def create_train_test_splits(input_sample_ids, test_percent=0.15, min_test_sampl
 
 #Input: ../Track3-Truth/JAX_068_DSM.txt (there contains origins, size and resolutions in UTM)
 #Ouput: Bounding box in longitude/latitude
-def read_DFC2019_lonlat_aoi(aoi_id, toc_dir, DSMFile=None):
+def read_lonlat_aoi(aoi_id, toc_dir, DSMFile=None):
     from bundle_adjust import geo_utils
     if aoi_id[:3] == "JAX":
         zonestring = "17" #"17R"
@@ -343,7 +342,7 @@ def CropImagePatches(aoi_id, dsm_dir, toc_dir, splits = True, min_alt=None, max_
     
     DSMTxtFile = dsm_dir + aoi_id + '_DSM.txt'
     DSMFile = dsm_dir + aoi_id + '_DSM.tif'
-    aoi_lonlat = read_DFC2019_lonlat_aoi(aoi_id, None, DSMTxtFile)
+    aoi_lonlat = read_lonlat_aoi(aoi_id, None, DSMTxtFile)
 
     if 1:
         with rasterio.open(DSMFile, 'r') as f:
@@ -439,7 +438,7 @@ def CropImagePatches(aoi_id, dsm_dir, toc_dir, splits = True, min_alt=None, max_
     if ba:
         run_ba(img_dir, output_dir)
 
-    newoutput_dir = create_dataset_from_DFC2019_data_zll(nerf_dir, aoi_id, img_dir, toc_dir, output_dir, DSMFile, use_ba=ba, min_alt=min_alt, max_alt=max_alt)  #, aoi_id=aoi_id
+    newoutput_dir = create_dataset(nerf_dir, aoi_id, img_dir, toc_dir, output_dir, DSMFile, use_ba=ba, min_alt=min_alt, max_alt=max_alt)  #, aoi_id=aoi_id
     generate_img_mask(newoutput_dir, aoi_id)
 
     # create train and test splits
