@@ -263,8 +263,8 @@ def eval_aoi(logs_dir, output_dir, epoch_number, split, infile_postfix=None, che
         samples_to_eval = np.arange(0, len(dataset))
     else:
         samples_to_eval = np.arange(0, len(dataset), 1)
-        samples_to_eval = np.arange(len(dataset)-1, len(dataset))
-        samples_to_eval = np.arange(0, 1)        
+        #samples_to_eval = np.arange(len(dataset)-1, len(dataset))
+        #samples_to_eval = np.arange(0, 1)        
         print('samples_to_eval', samples_to_eval)
 
     pt2d_BRF = [-1, -1]
