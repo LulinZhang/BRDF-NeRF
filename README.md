@@ -41,7 +41,7 @@ You can skip this step and directly download the [Djibouti dataset](https://driv
 Please use command `conda activate ba` to get into the `ba` environment for this step.
 ```
 aoi_id=Dji_012
-dsm_dir='/home/Documents/DSM'
+dsm_dir='/home/Documents/DSM/'
 dsm_file='Z_Num8_DeZoom1_STD-MALT.tif'
 coor_left=214430.250
 coor_upper=1286916.750
@@ -77,7 +77,7 @@ out_dir="$datadir"/dataset"$aoi_id"/root_dir/crops_rpcs_ba_v2/"$aoi_id"/
 for file in *.tif
 do
 filename="${file%.tif}"
-mm3d Malt GeomImage "IMG.*tif" RPC-d0-adj Master="$filename".tif SzW=1 Regul=0.05 NbVI=2 ZoomF="$zm" ResolTerrain=1 EZA=1 DirMEC=MM-"$filename"_ZM"$zm"/ 
+mm3d Malt GeomImage ".*tif" RPC-d0-adj Master="$filename".tif SzW=1 Regul=0.05 NbVI=2 ZoomF="$zm" ResolTerrain=1 EZA=1 DirMEC=MM-"$filename"_ZM"$zm"/ 
 mm3d TestLib GeoreferencedDepthMap MM-"$filename"_ZM"$zm" "$filename".tif Ori-RPC-d0-adj OutDir="$out_dir"DenseDepth_ZM"$zm"/ Mask=1 Scale="$zm"
 done
 ```
@@ -90,8 +90,6 @@ It is also possible if you prefer to use other software, just make sure your fin
   - `ImageName_2DPts.txt`: 2D coordinate in image frame for the pixels with valid depth value. The first line is width, and the second line is height.
   - `ImageName_3DPts.txt`: 3D coordinate in UTM for the pixels with valid depth value.
   - `ImageName_Correl.txt`: correlation score for the pixels with valid depth value.
-
-Each image `ImageName` corresponds to four txt files as displayed below.
 
 ## 2. Train SpS-NeRF
 Please use command `conda activate spsnerf` to get into the `spsnerf` environment for this step.
