@@ -33,7 +33,7 @@ bash -i setup_ba_env.sh
 ```
 
 ## 1. Prepare dataset
-You can skip this step and directly download the [Djibouti dataset](https://drive.google.com/file/d/1UFuEiG-_fNTTl22ZHzxiTy0wJi66qfHz/view?usp=sharing).
+You can skip this step and directly download the [Djibouti dataset](https://drive.google.com/file/d/1m-1mVV7ysEldmEUn1NgvK6zloMgyI3sB/view?usp=sharing).
 
 *You need to prepare a directory `ProjDir` to place the dataset.*
 
