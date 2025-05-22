@@ -366,7 +366,9 @@ def CropImagePatches(aoi_id, dsm_dir, toc_dir, splits = True, min_alt=None, max_
         elif rpc_type == "img":
             rpc = rpcm.rpc_from_geotiff(geotiff_path)
 
-        crop_ori, x, y = rpcm.utils.crop_aoi(geotiff_path, aoi_lonlat, z=alt_me, rpc=rpc, InputRPC = 1)
+        x, y, w, h = rpcm.utils.bounding_box_of_projected_aoi(rpc, aoi_lonlat, z=alt_me)
+        with rasterio.open(geotiff_path, 'r') as src:
+            crop_ori = src.read(window=((y, y + h), (x, x + w)), boundless=True).squeeze()
         crop = ScaleImg(crop_ori, min=min_, max=max_)
         print(geotiff_path)
         print('x, y after cropping ', x, y)
@@ -457,8 +459,8 @@ def CropDSM(aoi_id, dsm_dir, dsm_file, coor_left, coor_upper, resolution):
     output_txt = out_dir+aoi_id+'_DSM.txt'
     #act as we are inputting rpc to avoid loading rpc from geotiff_path
     print(aoi_id)  
-    crop, x, y = rpcm.utils.crop_aoi(geotiff_path, aoi_lonlat, InputRPC=1, CropDSM = True, box = [x, y, w, h])
     with rasterio.open(geotiff_path, 'r') as src:
+        crop = src.read(window=((y, y + h), (x, x + w)), boundless=True).squeeze()
         profile = src.profile
         tags = src.tags()
 
