@@ -7,6 +7,7 @@
 [Stéphane Jacquemoud](https://www.ipgp.fr/~jacquemoud/),
 [Yann Klinger](https://www.ipgp.fr/~klinger/)*
 
+This work has been accepted in the [International Journal of Applied Earth Observation and Geoinformation](https://www.sciencedirect.com/science/article/pii/S1569843225003942).
 
 ![](documents/teaser_v2.png)
 
